@@ -5,7 +5,7 @@ only functions here that touch the network). `clean_prices` is pure pandas and
 does the data-quality work that real market data always needs:
 
 * tickers that returned no data at all (typo, delisted, not on Yahoo),
-* tickers whose history starts later or ends earlier than the others,
+* tickers whose history starts later than requested (or than the others) or ends earlier,
 * short gaps from different exchange holidays (e.g. a Xetra ETF next to a US stock).
 
 No Streamlit in here: the app turns the returned issues into st.warning messages.
@@ -48,6 +48,9 @@ class CleanPrices:
     early_end: dict[str, pd.Timestamp] = field(default_factory=dict)
     filled_cells: int = 0
     dropped_days: int = 0
+    # What late_start was measured against: the requested start date, or None if
+    # none was given (then the earliest first date among the tickers).
+    requested_start: pd.Timestamp | None = None
 
     def messages(self) -> list[str]:
         """Plain-English description of the data issues, one sentence each."""
@@ -60,10 +63,17 @@ class CleanPrices:
             )
         if self.late_start:
             names = ", ".join(f"{t} ({d:%Y-%m-%d})" for t, d in self.late_start.items())
-            out.append(
-                f"Histories do not fully overlap: {names} start later than the requested "
-                "start date, so the analysis begins on the latest first date."
-            )
+            if self.requested_start is not None:
+                out.append(
+                    f"{names} start later than the requested start date "
+                    f"({self.requested_start:%Y-%m-%d}), so the analysis begins on "
+                    f"{self.prices.index[0]:%Y-%m-%d}."
+                )
+            else:
+                out.append(
+                    f"Histories do not fully overlap: {names} start later than the other "
+                    "tickers, so the analysis begins on the latest first date."
+                )
         if self.early_end:
             names = ", ".join(f"{t} ({d:%Y-%m-%d})" for t, d in self.early_end.items())
             out.append(f"{names} stop trading early, so the analysis ends on that date.")
@@ -85,6 +95,7 @@ def clean_prices(
     raw: pd.DataFrame,
     tickers: list[str],
     tolerance_days: int = 7,
+    requested_start: dt.date | None = None,
 ) -> CleanPrices:
     """Turn a raw (possibly ragged) price table into a fully aligned one.
 
@@ -96,8 +107,10 @@ def clean_prices(
     3. Short gaps inside that window are forward-filled; any row still incomplete
        (a gap longer than MAX_FILL_DAYS) is dropped and counted in `dropped_days`.
 
-    `tolerance_days` avoids warning about a ticker that starts a few days after
-    the others just because of a holiday at the start of the window.
+    Late starters are measured against `requested_start` if given (so a warning
+    appears even when every ticker starts after it), otherwise against the
+    earliest first date among the tickers. `tolerance_days` avoids warning about
+    a ticker that starts a few days late just because of a weekend or holiday.
     """
     invalid = [t for t in tickers if t not in raw.columns or raw[t].dropna().empty]
     valid = [t for t in tickers if t not in invalid]
@@ -115,7 +128,8 @@ def clean_prices(
         raise DataError("The price histories of these tickers do not overlap.")
 
     tolerance = pd.Timedelta(days=tolerance_days)
-    late_start = {t: d for t, d in first.items() if d - earliest_first > tolerance}
+    reference = earliest_first if requested_start is None else pd.Timestamp(requested_start)
+    late_start = {t: d for t, d in first.items() if d - reference > tolerance}
     early_end = {t: d for t, d in last.items() if latest_last - d > tolerance}
 
     window = prices.loc[common_start:common_end]
@@ -123,7 +137,15 @@ def clean_prices(
     filled_cells = int(window.isna().sum().sum() - filled.isna().sum().sum())
     aligned = filled.dropna(how="any")
     dropped_days = len(filled) - len(aligned)
-    return CleanPrices(aligned, invalid, late_start, early_end, filled_cells, dropped_days)
+    return CleanPrices(
+        aligned,
+        invalid,
+        late_start,
+        early_end,
+        filled_cells,
+        dropped_days,
+        None if requested_start is None else pd.Timestamp(requested_start),
+    )
 
 
 def currency_warning(currencies: dict[str, str | None]) -> str | None:

@@ -514,7 +514,7 @@ def main() -> None:
 
     try:
         raw, currencies = load_market_data(tickers, inputs.start, inputs.end)
-        cleaned = data.clean_prices(raw, list(tickers))
+        cleaned = data.clean_prices(raw, list(tickers), requested_start=inputs.start)
     except data.DataError as exc:
         st.error(str(exc))
         st.stop()

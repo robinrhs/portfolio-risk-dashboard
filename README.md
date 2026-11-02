@@ -121,7 +121,7 @@ VaR and ES are shown as positive numbers (loss as a share of portfolio value) an
 ### Data handling
 
 - **Invalid or delisted tickers** (no data returned) are excluded with a warning; the remaining weights are rescaled to 100 %.
-- **Non-overlapping histories:** the sample is cut to the period in which *all* positions and the benchmark have prices, and the app says which ticker caused the cut.
+- **Non-overlapping histories:** the sample is cut to the period in which *all* positions and the benchmark have prices, and the app says which ticker caused the cut. A ticker counts as starting late when its first price is more than a week after the chosen start date, so the warning also appears when every ticker starts after it.
 - **Gaps** of up to 5 trading days (e.g. different exchange holidays) are forward-filled, which means a 0 % return on those days. The number of filled prices is reported. Days that are still incomplete after that (a longer gap, e.g. a trading halt) are dropped, and the number of dropped days is reported too.
 - **Currencies:** each ticker's quote currency is looked up. If they differ (e.g. `EUNL.DE` in EUR next to `VTI` in USD), the app warns that returns are in each asset's own currency **without FX conversion**.
 - At least 60 overlapping trading days are required.

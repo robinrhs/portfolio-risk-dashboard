@@ -63,7 +63,8 @@ def run(args: argparse.Namespace) -> Analysis:
     positions = list(portfolio.weights.index)
     tickers = list(dict.fromkeys([*positions, args.benchmark]))
 
-    cleaned = data.clean_prices(data.download_prices(tickers, args.start, args.end), tickers)
+    raw = data.download_prices(tickers, args.start, args.end)
+    cleaned = data.clean_prices(raw, tickers, requested_start=args.start)
     for message in cleaned.messages() + portfolio.notes:
         print(f"NOTE: {message}")
 

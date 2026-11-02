@@ -63,6 +63,18 @@ def test_late_benchmark_cuts_the_window_and_is_named():
     assert "BENCH (2024-02-26) start later" in " ".join(cleaned.messages())
 
 
+def test_late_start_is_measured_against_the_requested_start_date():
+    raw = ragged_prices()[["A", "B"]].copy()  # both start on 2024-01-01
+    # Requested a year earlier: every ticker starts late, and the message says so.
+    cleaned = data.clean_prices(raw, ["A", "B"], requested_start=dt.date(2023, 1, 2))
+    assert list(cleaned.late_start) == ["A", "B"]
+    text = " ".join(cleaned.messages())
+    assert "A (2024-01-01), B (2024-01-01) start later than the requested start date" in text
+    assert "(2023-01-02), so the analysis begins on 2024-01-01." in text
+    # A start a weekend after the request (Sat 2023-12-30 -> Mon 2024-01-01) is not "late".
+    assert not data.clean_prices(raw, ["A", "B"], requested_start=dt.date(2023, 12, 30)).late_start
+
+
 def test_clean_prices_errors():
     raw = ragged_prices()
     with pytest.raises(data.DataError):

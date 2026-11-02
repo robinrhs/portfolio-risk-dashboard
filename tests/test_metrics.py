@@ -194,6 +194,12 @@ def test_overlapping_returns_compound_known_windows():
         m.overlapping_returns(r, 0)
 
 
+def test_overlapping_returns_keep_windows_with_a_total_loss():
+    # A -100 % day wipes out every window it is in: (1.01 * 0) - 1 and (0 * 1) - 1.
+    r = dated([0.01, -1.0, 0.0, 0.01])
+    np.testing.assert_allclose(m.overlapping_returns(r, 2).to_numpy(), [-1.0, -1.0, 0.01])
+
+
 def test_overlapping_var_of_constant_loss_is_compounded_loss():
     r = dated([-0.01] * 50)
     # Every 10-day window lost 1 - 0.99^10; sqrt-time would say 0.01 * sqrt(10) instead.

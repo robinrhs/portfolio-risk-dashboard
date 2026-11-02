@@ -331,12 +331,14 @@ def overlapping_returns(returns: pd.Series, horizon_days: int) -> pd.Series:
     of them), so neighbouring observations are not independent and quantiles
     estimated from them are noisier than the number of windows suggests.
     Returns n - h + 1 values; h = 1 gives back the daily returns.
+
+    Compounded with a rolling product, not a rolling sum of log(1 + r): a -100 %
+    day has log growth -inf, which the rolling sum turns into NaN, so the windows
+    containing the worst possible loss would silently disappear.
     """
-    if horizon_days < 1:
-        raise ValueError("horizon_days must be >= 1")
-    # Summing log growth over the window and converting back = compounding.
-    log_growth = np.log1p(returns).rolling(horizon_days).sum()
-    return np.expm1(log_growth).dropna()
+    _check_horizon(horizon_days)
+    growth = (1.0 + returns).rolling(horizon_days).apply(np.prod, raw=True)
+    return (growth - 1.0).dropna()
 
 
 def scale_to_horizon(one_day_risk: float, horizon_days: int) -> float:
@@ -348,6 +350,5 @@ def scale_to_horizon(one_day_risk: float, horizon_days: int) -> float:
     It ignores autocorrelation, volatility clustering and fat tails, and
     assumes the portfolio is not traded during the horizon.
     """
-    if horizon_days < 1:
-        raise ValueError("horizon_days must be >= 1")
+    _check_horizon(horizon_days)
     return float(one_day_risk * np.sqrt(horizon_days))

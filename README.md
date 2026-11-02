@@ -6,9 +6,11 @@
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
-**Live demo:** _coming soon_ <!-- TODO: add the Streamlit Community Cloud URL after deploying -->
+**Live demo:** _not deployed yet. The Streamlit Community Cloud link will go here (see [Deploy](#deploy-on-streamlit-community-cloud))._ <!-- TODO: paste the Streamlit Cloud URL after deploying -->
 
-<!-- TODO screenshot: add docs/screenshot.png (or a short GIF) of the dashboard with the default portfolio -->
+![Dashboard with the default portfolio: headline metrics, tail risk and growth of 100 vs. the MSCI World](docs/screenshot.png)
+
+<sub>Screenshot of the app with the default portfolio and default settings (5 years to 2 Nov 2026, live Yahoo data), captured headlessly.</sub>
 
 > Educational tool built on historical data. **Not investment advice**, not a forecast.
 
@@ -37,7 +39,7 @@ cd portfolio-risk-dashboard
 uv sync
 
 uv run streamlit run streamlit_app.py      # the dashboard, opens http://localhost:8501
-uv run portfolio-risk --help               # the same numbers in the terminal
+uv run portfolio-risk --help               # the same figures as a terminal report
 uv run pytest                              # tests (offline, synthetic data)
 ```
 
@@ -45,7 +47,7 @@ The app opens with a diversified default portfolio (VTI 30 %, VEA 20 %, VWO 10 %
 
 ## Example output
 
-Real output of the command-line report for the default portfolio, run on 2 Nov 2026 (`uv run portfolio-risk --start 2020-11-02 --end 2025-10-31`). Yahoo revises adjusted prices from time to time, so later runs can differ slightly in the last digits.
+Real output of the command-line report for the default portfolio, run on 2 Nov 2026 (`uv run portfolio-risk --start 2020-11-02 --end 2025-10-31`). Yahoo revises adjusted prices from time to time, so later runs can differ slightly in the last digits. The CLI uses the same `analyze()` call and the same input checks as the app (start before end, confidence between 0 and 1, at least 60 trading days) and exits with a one-line error otherwise.
 
 ```text
 Period: 2020-11-03 to 2025-10-31 (1255 daily returns)
@@ -82,6 +84,7 @@ How to read it:
 - **Bonds diversify risk.** BND is 25 % of the capital but only about 5 % of the risk. VTI is 30 % of the capital and 43 % of the risk.
 - **Beta and correlation are different things.** The portfolio moves almost in lockstep with the MSCI World (correlation 0.95), but with only about two thirds of its amplitude (beta 0.66 = 0.95 × 11.2 % / 16.2 %).
 - **The tail is fatter than the normal distribution assumes.** Historical ES (1.56 %) is above the normal ES (1.41 %), even though the two VaR figures are close.
+- **√time is only an approximation.** With `--horizon 10` the same run prints a 10-day historical VaR of 3.36 % (1.06 % × √10). The historical VaR of the overlapping 10-day returns in this sample was 3.16 %, so here √time overstated the 10-day VaR slightly. Both figures are shown; neither is exact.
 
 For the same period, the efficient-frontier tab puts the max-Sharpe portfolio at roughly 55 % GLD and 45 % VTI. That says more about gold's run in 2020–2025 than about the future. Mean-variance weights follow whatever performed best in the sample (see *Limitations*).
 
@@ -99,13 +102,14 @@ All maths lives in UI-free modules (`metrics.py`, `contributions.py`, `optimize.
 | Sharpe | $\dfrac{\overline{r_t - r_{f,d}}}{\operatorname{std}(r_t)}\sqrt{N}$ | constant risk-free rate |
 | Downside deviation | $\sqrt{\tfrac{1}{n}\sum_t \min(r_t - \text{MAR}_d, 0)^2}\,\sqrt{N}$ | MAR = risk-free rate; mean over **all** days |
 | Sortino | $\dfrac{(\bar r - \text{MAR}_d)\,N}{\text{DD}}$ | only penalises returns below the MAR |
-| Drawdown | $D_t = W_t / \max_{s \le t} W_s - 1$, $W_t = \prod_{s\le t}(1+r_s)$ | starting capital counts as the first peak |
+| Drawdown | $D_t = W_t / \max_{s \le t} W_s - 1$, $W_t = \prod_{s\le t}(1+r_s)$ | starting capital counts as the first peak (then reported with the first return date) |
 | Beta | $\beta = \operatorname{Cov}(r_p, r_b) / \operatorname{Var}(r_b)$ | overlapping dates only |
 | Historical VaR | $\text{VaR}_c = -q_{1-c}(r)$ | empirical quantile, linear interpolation |
 | Historical ES | $\text{ES}_c = -\operatorname{mean}(r_t \mid r_t \le q_{1-c})$ | average loss beyond VaR |
 | Normal VaR | $\text{VaR}_c = z_c\,\sigma_d - \mu_d$ | $z_{0.95} = 1.645$, $z_{0.99} = 2.326$ |
 | Normal ES | $\text{ES}_c = \sigma_d\,\varphi(z_c)/(1-c) - \mu_d$ | $\varphi$ = standard normal density |
 | h-day scaling | $\text{VaR}_h \approx \text{VaR}_1\sqrt{h}$ | **approximation**, exact only for i.i.d. normal, zero-mean returns |
+| h-day check | $\text{VaR}^{\text{overlap}}_h = -q_{1-c}\big(\prod_{s=t-h+1}^{t}(1+r_s) - 1\big)$ | historical VaR of overlapping h-day returns, shown next to the scaled figure; overlapping windows are not independent, so it is noisy |
 | Return contribution | $w_i\,\bar r_i\,N$ | sums to the arithmetic mean return (not to CAGR) |
 | Risk contribution | $RC_i = w_i\,(\Sigma w)_i / \sigma_p$ | Euler: $\sum_i RC_i = \sigma_p$ because $\sigma_p$ is homogeneous of degree 1 in $w$ |
 | Min variance | $\min_w w^\top\Sigma w$ | s.t. $\sum w_i = 1$, $0 \le w_i \le 1$ |
@@ -118,7 +122,7 @@ VaR and ES are shown as positive numbers (loss as a share of portfolio value) an
 
 - **Invalid or delisted tickers** (no data returned) are excluded with a warning; the remaining weights are rescaled to 100 %.
 - **Non-overlapping histories:** the sample is cut to the period in which *all* positions and the benchmark have prices, and the app says which ticker caused the cut.
-- **Gaps** of up to 5 trading days (e.g. different exchange holidays) are forward-filled, which means a 0 % return on those days. The number of filled prices is reported.
+- **Gaps** of up to 5 trading days (e.g. different exchange holidays) are forward-filled, which means a 0 % return on those days. The number of filled prices is reported. Days that are still incomplete after that (a longer gap, e.g. a trading halt) are dropped, and the number of dropped days is reported too.
 - **Currencies:** each ticker's quote currency is looked up. If they differ (e.g. `EUNL.DE` in EUR next to `VTI` in USD), the app warns that returns are in each asset's own currency **without FX conversion**.
 - At least 60 overlapping trading days are required.
 
@@ -139,6 +143,7 @@ VaR and ES are shown as positive numbers (loss as a share of portfolio value) an
 - **Mean-variance optimisation is very sensitive to expected returns.** Small changes in historical means move the max-Sharpe weights a lot (see the gold example above). The frontier illustrates the trade-off. It is not a recommended allocation.
 - **Data source.** Yahoo Finance via the unofficial `yfinance` library: free, but without guarantees on availability, accuracy or terms of use. Not suitable for production use.
 - **Currency mixes** are only detected and flagged, not converted.
+- **Different exchanges close at different times.** For a portfolio that mixes exchanges (e.g. `EUNL.DE` next to `VTI`), news after the Frankfurt close shows up in the US price on the same day but in the German price only the next day. Forward-filled holidays add 0 % days. Both effects push measured correlations and beta towards zero and understate portfolio volatility. Weekly returns would reduce the effect; the app uses daily returns.
 
 ## Deploy on Streamlit Community Cloud
 
@@ -164,7 +169,8 @@ portfolio-risk-dashboard/
 │   ├── charts.py                 # Plotly figures (no maths, no Streamlit)
 │   ├── app.py                    # Streamlit layout and inputs
 │   └── cli.py                    # `portfolio-risk` terminal report
-├── tests/                        # pytest: known-answer maths tests + AppTest of the full app
+├── docs/screenshot.png           # README screenshot
+├── tests/                        # pytest: known-answer maths tests, CLI, AppTest of the full app
 ├── data/example_portfolio.csv    # example upload (ticker, weight)
 ├── .streamlit/config.toml        # theme
 ├── requirements.txt              # exported from uv.lock for Streamlit Cloud
@@ -173,7 +179,7 @@ portfolio-risk-dashboard/
 
 ### Tests
 
-`uv run pytest` runs offline. The maths tests use synthetic series with known answers: constant returns, series rescaled to an exact mean and volatility, a hand-computed drawdown and Sortino, VaR/ES on a uniform grid and on a large normal sample, risk contributions that must sum to volatility, and the closed-form two-asset minimum-variance and tangency portfolios. The app test runs the real `streamlit_app.py` with `streamlit.testing.v1.AppTest` and replaces the Yahoo download with deterministic synthetic prices.
+`uv run pytest` runs offline. The maths tests use synthetic series with known answers: constant returns, series rescaled to an exact mean and volatility, a hand-computed drawdown and Sortino, VaR/ES on a uniform grid and on a large normal sample, risk contributions that must sum to volatility, and the closed-form two-asset minimum-variance and tangency portfolios. `analyze()` is checked on two assets where one moves exactly 3× the other, so beta, volatility and the risk contributions are known in closed form. The app test runs the real `streamlit_app.py` with `streamlit.testing.v1.AppTest` and replaces the Yahoo download with deterministic synthetic prices; it covers the default portfolio, invalid tickers, currency mixes, weight normalisation, the CSV upload, the 60-day minimum and the wording of the horizon caption. The CLI tests check the printed report and every error exit.
 
 ## License
 

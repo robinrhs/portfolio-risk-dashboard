@@ -165,8 +165,10 @@ class MaxDrawdown:
     """Largest peak-to-trough fall of the wealth index.
 
     depth is negative (e.g. -0.25 = the portfolio fell 25 % from its high).
-    peak_date is the last high before the trough; if the high was the starting
-    capital itself, it is the first date of the sample. recovery_date is the
+    peak_date is the last high before the trough. If the high was the starting
+    capital itself, peak_date is the first RETURN date, i.e. the first trading
+    day after the start price (the day the loss began), because the series is
+    indexed by return dates. recovery_date is the
     first date the old high was regained, or None if it never was.
     """
 
@@ -303,6 +305,24 @@ def parametric_es(returns: pd.Series, confidence: float = 0.95) -> float:
     sigma = float(returns.std(ddof=1))
     z = norm.ppf(confidence)
     return float(sigma * norm.pdf(z) / (1.0 - confidence) - mu)
+
+
+def overlapping_returns(returns: pd.Series, horizon_days: int) -> pd.Series:
+    """Compounded returns over every window of h consecutive days ("rolling" h-day returns).
+
+    R_t = prod_{s=t-h+1}^{t} (1 + r_s) - 1
+
+    Used to check the sqrt-time approximation against what h-day losses
+    actually looked like in the sample. The windows overlap (day t is in h
+    of them), so neighbouring observations are not independent and quantiles
+    estimated from them are noisier than the number of windows suggests.
+    Returns n - h + 1 values; h = 1 gives back the daily returns.
+    """
+    if horizon_days < 1:
+        raise ValueError("horizon_days must be >= 1")
+    # Summing log growth over the window and converting back = compounding.
+    log_growth = np.log1p(returns).rolling(horizon_days).sum()
+    return np.expm1(log_growth).dropna()
 
 
 def scale_to_horizon(one_day_risk: float, horizon_days: int) -> float:

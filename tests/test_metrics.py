@@ -161,3 +161,32 @@ def test_sqrt_time_scaling_and_input_checks():
         m.scale_to_horizon(0.02, 0)
     with pytest.raises(ValueError):
         m.historical_var(dated([0.01, -0.01]), 95)  # percent instead of fraction
+
+
+def test_overlapping_returns_compound_known_windows():
+    r = dated([0.10, -0.10, 0.10, 0.0])
+    two_day = m.overlapping_returns(r, 2)
+    # Windows: (1.1 * 0.9), (0.9 * 1.1), (1.1 * 1.0), each minus 1.
+    np.testing.assert_allclose(two_day.to_numpy(), [-0.01, -0.01, 0.10])
+    assert list(two_day.index) == list(r.index[1:])  # labelled by the window's last day
+    np.testing.assert_allclose(m.overlapping_returns(r, 1).to_numpy(), r.to_numpy())
+    assert m.overlapping_returns(r, 5).empty  # sample shorter than the horizon
+    with pytest.raises(ValueError):
+        m.overlapping_returns(r, 0)
+
+
+def test_overlapping_var_of_constant_loss_is_compounded_loss():
+    r = dated([-0.01] * 50)
+    # Every 10-day window lost 1 - 0.99^10; sqrt-time would say 0.01 * sqrt(10) instead.
+    expected = 1 - 0.99**10
+    assert m.historical_var(m.overlapping_returns(r, 10), 0.95) == pytest.approx(expected)
+    assert m.scale_to_horizon(m.historical_var(r, 0.95), 10) != pytest.approx(expected)
+
+
+def test_peak_date_is_first_return_date_when_start_capital_is_the_peak():
+    prices = dated([100.0, 90.0, 95.0])
+    mdd = m.max_drawdown(m.simple_returns(prices))
+    # Returns are indexed from the second price on: the peak is reported as that first
+    # return date (the day the loss began), not as the date of the starting price.
+    assert mdd.peak_date == prices.index[1]
+    assert mdd.trough_date == prices.index[1]

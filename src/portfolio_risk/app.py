@@ -13,7 +13,7 @@ import pandas as pd
 import streamlit as st
 
 from portfolio_risk import charts, data, metrics, optimize
-from portfolio_risk.analysis import Analysis, Settings, analyze, summary_table
+from portfolio_risk.analysis import Analysis, Settings, TailRisk, analyze, summary_table
 from portfolio_risk.portfolio import (
     DEFAULT_BENCHMARK,
     clean_portfolio,
@@ -317,10 +317,25 @@ def tail_risk_metrics(result: Analysis, portfolio_value: float) -> None:
             help=HELP[key],
             border=True,
         )
-    st.caption(
-        f"Read: on {1 - t.confidence:.1%} of {t.horizon_days}-day periods the historical loss "
-        f"was larger than the VaR; when it was, the average loss was the ES. "
-        "Based on past data only: not a forecast."
+    st.caption(tail_risk_caption(t))
+
+
+def tail_risk_caption(t: TailRisk) -> str:
+    """How to read the tail-risk row; for h > 1 it must not pretend to be an h-day statistic."""
+    tail = f"{1 - t.confidence:.1%}"
+    if t.horizon_days == 1:
+        return (
+            f"Read: on {tail} of past days the 1-day loss was larger than the VaR; when it "
+            "was, the average loss was the ES. Based on past data only: not a forecast."
+        )
+    h = t.horizon_days
+    return (
+        f"Read: on {tail} of past days the 1-day loss was larger than the 1-day VaR. The "
+        f"{h}-day figures shown are those 1-day values × √{h}, an approximation, not "
+        f"measured {h}-day losses. For comparison, the historical VaR of overlapping "
+        f"{h}-day returns in this sample is {pct(t.historical_var_overlapping)} (overlapping "
+        "windows share days, so this estimate is noisy). Based on past data only: not a "
+        "forecast."
     )
 
 

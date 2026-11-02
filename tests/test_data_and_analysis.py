@@ -112,6 +112,52 @@ def test_analyze_is_consistent_with_metric_functions():
     assert "Historical VaR (99.0% 10-day)" in table.index
 
 
+def test_analyze_known_answers_for_levered_twin_assets():
+    # Asset B always moves exactly 3x asset A, and A is also the benchmark. With 50/50
+    # weights the portfolio return is 0.5 a + 0.5 (3 a) = 2 a, so every figure is known:
+    a = np.random.default_rng(7).normal(0.0002, 0.005, 400)
+    idx = pd.bdate_range("2022-01-03", periods=401)
+    prices = pd.DataFrame(
+        {
+            "A": 100 * np.cumprod(np.r_[1.0, 1 + a]),
+            "B": 100 * np.cumprod(np.r_[1.0, 1 + 3 * a]),
+        },
+        index=idx,
+    )
+    weights = pd.Series({"A": 0.5, "B": 0.5})
+    result = analyze(prices, weights, prices["A"], Settings(confidence=0.95, horizon_days=5))
+
+    np.testing.assert_allclose(result.portfolio.to_numpy(), 2 * a)
+    sigma_a = a.std(ddof=1) * np.sqrt(252)
+    assert result.portfolio_stats.annual_volatility == pytest.approx(2 * sigma_a)
+    assert result.beta == pytest.approx(2.0)
+    assert result.correlation_to_benchmark == pytest.approx(1.0)
+    # Sigma w = 0.5 * [s^2 + 3 s^2, 3 s^2 + 9 s^2] = [2 s^2, 6 s^2], sigma_p = 2 s
+    # => RC_A = 0.5 * 2 s^2 / 2 s = 0.5 s, RC_B = 1.5 s, shares 25 % / 75 %.
+    rc = result.contributions
+    assert rc.loc["A", "risk_contribution"] == pytest.approx(0.5 * sigma_a)
+    assert rc.loc["B", "risk_contribution"] == pytest.approx(1.5 * sigma_a)
+    assert rc["risk_share"].tolist() == pytest.approx([0.25, 0.75])
+    # Return contributions: w_i * mean_i * 252 = 0.5 * mean(a) * 252 and 0.5 * 3 * mean(a) * 252.
+    assert rc["return_contribution"].tolist() == pytest.approx(
+        [0.5 * a.mean() * 252, 1.5 * a.mean() * 252]
+    )
+    # Tail risk: the 1-day historical VaR of 2a, scaled by sqrt(5); overlapping check is unscaled.
+    one_day = -np.quantile(2 * a, 0.05)
+    assert result.tail_risk.historical_var == pytest.approx(one_day * np.sqrt(5))
+    five_day = np.convolve(np.log1p(2 * a), np.ones(5), mode="valid")
+    assert result.tail_risk.historical_var_overlapping == pytest.approx(
+        -np.quantile(np.expm1(five_day), 0.05)
+    )
+
+
+def test_analyze_horizon_longer_than_sample_gives_nan_overlapping_var():
+    prices = synthetic_prices(["A", "B"], dt.date(2024, 1, 1), dt.date(2024, 1, 31))
+    result = analyze(prices, pd.Series({"A": 0.5, "B": 0.5}), None, Settings(horizon_days=60))
+    assert np.isnan(result.tail_risk.historical_var_overlapping)
+    assert np.isfinite(result.tail_risk.historical_var)
+
+
 def test_analyze_without_benchmark_and_charts_build():
     prices = synthetic_prices(["A", "B"], dt.date(2022, 1, 1), dt.date(2022, 12, 31))
     weights = pd.Series({"A": 0.6, "B": 0.4})

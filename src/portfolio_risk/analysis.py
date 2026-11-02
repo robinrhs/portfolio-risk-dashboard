@@ -36,7 +36,13 @@ class SeriesStats:
 
 @dataclass(frozen=True)
 class TailRisk:
-    """VaR / ES as positive loss fractions at the chosen confidence and horizon."""
+    """VaR / ES as positive loss fractions at the chosen confidence and horizon.
+
+    For horizon_days > 1 the four main figures are 1-day values x sqrt(h).
+    historical_var_overlapping is the empirical VaR of the overlapping h-day
+    returns in the sample, shown next to the scaled figure as a reality check
+    (identical to historical_var when h = 1).
+    """
 
     confidence: float
     horizon_days: int
@@ -44,6 +50,7 @@ class TailRisk:
     historical_es: float
     parametric_var: float
     parametric_es: float
+    historical_var_overlapping: float
 
 
 @dataclass(frozen=True)
@@ -78,6 +85,10 @@ def tail_risk(returns: pd.Series, confidence: float, horizon_days: int) -> TailR
     def scale(x: float) -> float:
         return m.scale_to_horizon(x, horizon_days)
 
+    # Reality check for the sqrt-time rule; undefined if the sample is shorter than h.
+    windows = m.overlapping_returns(returns, horizon_days)
+    overlapping_var = m.historical_var(windows, confidence) if len(windows) else float("nan")
+
     return TailRisk(
         confidence=confidence,
         horizon_days=horizon_days,
@@ -85,6 +96,7 @@ def tail_risk(returns: pd.Series, confidence: float, horizon_days: int) -> TailR
         historical_es=scale(m.historical_es(returns, confidence)),
         parametric_var=scale(m.parametric_var(returns, confidence)),
         parametric_es=scale(m.parametric_es(returns, confidence)),
+        historical_var_overlapping=overlapping_var,
     )
 
 

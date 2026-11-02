@@ -59,7 +59,8 @@ def test_known_volatility_and_sharpe():
     r = exact_moments(1000, mean=0.0004, std=0.01)
     assert m.annualized_volatility(r) == pytest.approx(0.01 * np.sqrt(252))
     rf = 0.02
-    expected = (0.0004 - m.per_period_rate(rf)) / 0.01 * np.sqrt(252)
+    rf_daily = 1.02 ** (1 / 252) - 1  # written out, not taken from the package
+    expected = (0.0004 - rf_daily) / 0.01 * np.sqrt(252)
     assert m.sharpe_ratio(r, rf) == pytest.approx(expected)
 
 

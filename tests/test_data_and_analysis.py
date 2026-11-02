@@ -123,6 +123,9 @@ def test_download_prices_extracts_adjusted_close(monkeypatch):
 
 
 def test_analyze_is_consistent_with_metric_functions():
+    # Wiring check only: analyze() must pass the right series and settings to the metric
+    # functions. Correctness of the figures is tested against known answers elsewhere
+    # (test_metrics.py and the levered-twin test below).
     prices = synthetic_prices(["A", "B", "C", "BM"], dt.date(2021, 1, 1), dt.date(2023, 12, 31))
     weights = pd.Series({"A": 0.5, "B": 0.3, "C": 0.2})
     settings = Settings(risk_free=0.03, confidence=0.99, horizon_days=10)

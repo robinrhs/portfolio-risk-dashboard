@@ -179,6 +179,11 @@ def test_analyze_known_answers_for_levered_twin_assets():
     # Tail risk: the 1-day historical VaR of 2a, scaled by sqrt(5); overlapping check is unscaled.
     one_day = -np.quantile(2 * a, 0.05)
     assert result.tail_risk.historical_var == pytest.approx(one_day * np.sqrt(5))
+    # Normal 5-day VaR: z * sd(2a) * sqrt(5) - 5 * mean(2a), z = 1.6448536 at 95 %.
+    mu_p, sd_p = (2 * a).mean(), (2 * a).std(ddof=1)
+    assert result.tail_risk.parametric_var == pytest.approx(
+        1.6448536269514722 * sd_p * np.sqrt(5) - 5 * mu_p
+    )
     five_day = np.convolve(np.log1p(2 * a), np.ones(5), mode="valid")
     assert result.tail_risk.historical_var_overlapping == pytest.approx(
         -np.quantile(np.expm1(five_day), 0.05)

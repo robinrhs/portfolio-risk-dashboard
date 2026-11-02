@@ -20,7 +20,7 @@ Enter tickers and weights (or upload a CSV), choose a benchmark and a period, an
 
 - downloads daily adjusted close prices from Yahoo Finance (cached for 6 hours),
 - reports **annualised return (CAGR)**, **volatility**, **Sharpe** and **Sortino** ratios, **max drawdown** with peak, trough and recovery dates, and **beta / correlation** to the benchmark,
-- estimates **Value at Risk** and **Expected Shortfall**, both **historical** and **parametric (normal)**, for a 1-day horizon. Longer horizons are scaled with √time and labelled as an approximation,
+- estimates **Value at Risk** and **Expected Shortfall**, both **historical** and **parametric (normal)**, for a 1-day horizon. For longer horizons the historical figures are scaled with √time and labelled as an approximation; the normal figures use the h-day normal distribution,
 - plots cumulative performance vs. benchmark, the drawdown curve, the return distribution with VaR thresholds and a correlation heatmap,
 - splits **return and risk by position**: Euler risk contributions add up exactly to portfolio volatility,
 - draws the long-only **mean-variance efficient frontier** with the minimum-variance and maximum-Sharpe portfolios.
@@ -106,9 +106,9 @@ All maths lives in UI-free modules (`metrics.py`, `contributions.py`, `optimize.
 | Beta | $\beta = \operatorname{Cov}(r_p, r_b) / \operatorname{Var}(r_b)$ | overlapping dates only |
 | Historical VaR | $\text{VaR}_c = -q_{1-c}(r)$ | empirical quantile, linear interpolation |
 | Historical ES | $\text{ES}_c = -\operatorname{mean}(r_t \mid r_t \le q_{1-c})$ | average loss beyond VaR |
-| Normal VaR | $\text{VaR}_c = z_c\,\sigma_d - \mu_d$ | $z_{0.95} = 1.645$, $z_{0.99} = 2.326$ |
-| Normal ES | $\text{ES}_c = \sigma_d\,\varphi(z_c)/(1-c) - \mu_d$ | $\varphi$ = standard normal density |
-| h-day scaling | $\text{VaR}_h \approx \text{VaR}_1\sqrt{h}$ | **approximation**, exact only for i.i.d. normal, zero-mean returns |
+| Normal VaR | $\text{VaR}_c = z_c\,\sigma_d - \mu_d$; h days: $z_c\,\sigma_d\sqrt{h} - h\,\mu_d$ | $z_{0.95} = 1.645$, $z_{0.99} = 2.326$; h-day return = sum of h i.i.d. normal daily returns |
+| Normal ES | $\text{ES}_c = \sigma_d\,\varphi(z_c)/(1-c) - \mu_d$; h days: $\sigma_d\sqrt{h}\,\varphi(z_c)/(1-c) - h\,\mu_d$ | $\varphi$ = standard normal density |
+| h-day scaling (historical) | $\text{VaR}_h \approx \text{VaR}_1\sqrt{h}$, same for ES | **approximation**, exact only for i.i.d. normal, zero-mean returns |
 | h-day check | $\text{VaR}^{\text{overlap}}_h = -q_{1-c}\big(\prod_{s=t-h+1}^{t}(1+r_s) - 1\big)$ | historical VaR of overlapping h-day returns, shown next to the scaled figure; overlapping windows are not independent, so it is noisy |
 | Return contribution | $w_i\,\bar r_i\,N$ | sums to the arithmetic mean return (not to CAGR) |
 | Risk contribution | $RC_i = w_i\,(\Sigma w)_i / \sigma_p$ | Euler: $\sum_i RC_i = \sigma_p$ because $\sigma_p$ is homogeneous of degree 1 in $w$ |

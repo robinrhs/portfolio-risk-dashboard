@@ -19,7 +19,7 @@ from portfolio_risk.portfolio import portfolio_returns
 class Settings:
     risk_free: float = 0.02  # annual, also used as the Sortino MAR
     confidence: float = 0.95  # VaR / ES confidence level
-    horizon_days: int = 1  # VaR / ES horizon (> 1 uses sqrt-time scaling)
+    horizon_days: int = 1  # VaR / ES horizon (> 1: see TailRisk)
 
 
 @dataclass(frozen=True)
@@ -38,7 +38,9 @@ class SeriesStats:
 class TailRisk:
     """VaR / ES as positive loss fractions at the chosen confidence and horizon.
 
-    For horizon_days > 1 the four main figures are 1-day values x sqrt(h).
+    For horizon_days > 1 the historical VaR/ES are 1-day values x sqrt(h) (an
+    approximation), while the parametric VaR/ES use the h-day normal distribution
+    implied by i.i.d. normal daily returns (mean h * mu, volatility sigma * sqrt(h)).
     historical_var_overlapping is the empirical VaR of the overlapping h-day
     returns in the sample, shown next to the scaled figure as a reality check
     (identical to historical_var when h = 1).
@@ -80,7 +82,7 @@ def series_stats(returns: pd.Series, risk_free: float) -> SeriesStats:
 
 
 def tail_risk(returns: pd.Series, confidence: float, horizon_days: int) -> TailRisk:
-    """1-day VaR/ES from daily data, scaled by sqrt(h) if a longer horizon is chosen."""
+    """VaR/ES from daily data: historical ones scaled by sqrt(h), normal ones in closed form."""
 
     def scale(x: float) -> float:
         return m.scale_to_horizon(x, horizon_days)
@@ -94,8 +96,8 @@ def tail_risk(returns: pd.Series, confidence: float, horizon_days: int) -> TailR
         horizon_days=horizon_days,
         historical_var=scale(m.historical_var(returns, confidence)),
         historical_es=scale(m.historical_es(returns, confidence)),
-        parametric_var=scale(m.parametric_var(returns, confidence)),
-        parametric_es=scale(m.parametric_es(returns, confidence)),
+        parametric_var=m.parametric_var(returns, confidence, horizon_days),
+        parametric_es=m.parametric_es(returns, confidence, horizon_days),
         historical_var_overlapping=overlapping_var,
     )
 

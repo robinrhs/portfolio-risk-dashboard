@@ -32,6 +32,7 @@ def test_report_notes_bad_tickers_and_horizon_scaling(tmp_path, capsys):
     assert "NOTE: Mixed quote currencies" in out
     assert "Weights: AAA 75.0%, CCC.DE 25.0%" in out
     assert "1-day figures x sqrt(10) (approximation)" in out
+    assert "Parametric VaR/ES: 10-day normal distribution" in out
     assert "overlapping 10-day returns" in out
 
 

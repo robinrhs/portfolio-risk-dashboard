@@ -276,35 +276,49 @@ def historical_es(returns: pd.Series, confidence: float = 0.95) -> float:
     return float(-tail.mean())
 
 
-def parametric_var(returns: pd.Series, confidence: float = 0.95) -> float:
+def _check_horizon(horizon_days: int) -> None:
+    if horizon_days < 1:
+        raise ValueError("horizon_days must be >= 1")
+
+
+def parametric_var(returns: pd.Series, confidence: float = 0.95, horizon_days: int = 1) -> float:
     """Parametric (variance-covariance) VaR assuming normally distributed returns.
 
-    VaR_c = -(mu + z_{1-c} * sigma) = z_c * sigma - mu
+    VaR_c = -(mu + z_{1-c} * sigma) = z_c * sigma - mu                (1 day)
+    VaR_c,h = z_c * sigma * sqrt(h) - h * mu                          (h days)
 
     mu and sigma are the sample mean and standard deviation of daily returns,
-    z_c the standard normal quantile (1.645 for 95 %, 2.326 for 99 %). Real
-    returns have fatter tails than the normal, so this tends to understate
+    z_c the standard normal quantile (1.645 for 95 %, 2.326 for 99 %). For
+    h > 1 the h-day return is the sum of h i.i.d. normal daily returns, which
+    is normal with mean h * mu and standard deviation sigma * sqrt(h). That is
+    exact under the model's own assumptions (it ignores compounding within the
+    horizon), unlike scaling the whole 1-day VaR, mean included, by sqrt(h).
+    Real returns have fatter tails than the normal, so this tends to understate
     extreme losses.
     """
     _check_confidence(confidence)
+    _check_horizon(horizon_days)
     mu = float(returns.mean())
     sigma = float(returns.std(ddof=1))
-    return float(norm.ppf(confidence) * sigma - mu)
+    return float(norm.ppf(confidence) * sigma * np.sqrt(horizon_days) - horizon_days * mu)
 
 
-def parametric_es(returns: pd.Series, confidence: float = 0.95) -> float:
+def parametric_es(returns: pd.Series, confidence: float = 0.95, horizon_days: int = 1) -> float:
     """Parametric Expected Shortfall under the normal assumption.
 
-    ES_c = sigma * phi(z_c) / (1 - c) - mu
+    ES_c = sigma * phi(z_c) / (1 - c) - mu                            (1 day)
+    ES_c,h = sigma * sqrt(h) * phi(z_c) / (1 - c) - h * mu            (h days)
 
     phi is the standard normal density. Closed form for the mean of a normal
-    distribution beyond its (1 - c) quantile.
+    distribution beyond its (1 - c) quantile; the h-day version uses the same
+    h-day normal distribution as parametric_var.
     """
     _check_confidence(confidence)
+    _check_horizon(horizon_days)
     mu = float(returns.mean())
-    sigma = float(returns.std(ddof=1))
+    sigma = float(returns.std(ddof=1)) * np.sqrt(horizon_days)
     z = norm.ppf(confidence)
-    return float(sigma * norm.pdf(z) / (1.0 - confidence) - mu)
+    return float(sigma * norm.pdf(z) / (1.0 - confidence) - horizon_days * mu)
 
 
 def overlapping_returns(returns: pd.Series, horizon_days: int) -> pd.Series:

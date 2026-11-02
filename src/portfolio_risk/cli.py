@@ -99,7 +99,9 @@ def print_report(result: Analysis) -> None:
     t = result.tail_risk
     if t.horizon_days > 1:
         print(
-            f"\nVaR/ES above: 1-day figures x sqrt({t.horizon_days}) (approximation). "
+            f"\nHistorical VaR/ES above: 1-day figures x sqrt({t.horizon_days}) "
+            f"(approximation). Parametric VaR/ES: {t.horizon_days}-day normal distribution "
+            f"(mean x {t.horizon_days}, volatility x sqrt({t.horizon_days})). "
             f"Historical VaR of overlapping {t.horizon_days}-day returns for comparison: "
             f"{t.historical_var_overlapping:.4f}"
         )

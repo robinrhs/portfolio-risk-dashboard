@@ -106,6 +106,7 @@ def test_horizon_scaling_is_labelled_as_approximation():
     # The caption must say the 10-day figure is scaled, not a measured 10-day statistic,
     # and show the historical VaR of overlapping 10-day returns next to it.
     assert "1-day values × √10, an approximation, not measured 10-day losses" in captions
+    assert "normal figures use the 10-day normal distribution" in captions
     assert "historical VaR of overlapping 10-day returns" in captions
     assert "of 10-day periods" not in captions
 

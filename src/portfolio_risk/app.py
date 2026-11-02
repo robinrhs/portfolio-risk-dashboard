@@ -55,10 +55,11 @@ HELP = {
     "days. No distribution assumed. It says nothing about how bad losses beyond it get.",
     "hes": "Historical Expected Shortfall: the AVERAGE loss on the days that were worse "
     "than the VaR. Describes the tail that VaR ignores.",
-    "pvar": "Parametric VaR assuming normally distributed returns: z × σ − μ. Real returns "
+    "pvar": "Parametric VaR assuming normally distributed returns: z × σ − μ for one day, "
+    "z × σ × √h − h × μ for h days. Real returns "
     "have fatter tails than the normal, so this often understates extreme losses.",
     "pes": "Parametric Expected Shortfall under the normal distribution: the average loss "
-    "beyond the normal VaR, σ·φ(z)/(1 − c) − μ.",
+    "beyond the normal VaR, σ·φ(z)/(1 − c) − μ (h days: σ√h·φ(z)/(1 − c) − h·μ).",
 }
 
 
@@ -208,8 +209,9 @@ def sidebar() -> Inputs:
         min_value=1,
         max_value=60,
         value=1,
-        help="Risk is estimated on 1-day returns. Longer horizons use √time scaling, "
-        "an approximation that assumes independent, normally distributed returns.",
+        help="Risk is estimated on 1-day returns. For longer horizons the historical "
+        "VaR/ES are scaled by √time (an approximation) and the normal VaR/ES use the "
+        "h-day normal distribution. Both assume independent daily returns.",
     )
     value = sb.number_input(
         "Portfolio value (for VaR in money)", min_value=0.0, value=100_000.0, step=10_000.0
@@ -310,7 +312,7 @@ def headline_metrics(result: Analysis) -> None:
 def tail_risk_metrics(result: Analysis, portfolio_value: float) -> None:
     t = result.tail_risk
     horizon = f"{t.horizon_days}-day" + (
-        " (√time-scaled, approximation)" if t.horizon_days > 1 else ""
+        " (historical: √time-scaled approximation)" if t.horizon_days > 1 else ""
     )
     st.subheader(f"Tail risk · {t.confidence:.1%} confidence · {horizon}")
     cols = st.columns(4)
@@ -345,8 +347,10 @@ def tail_risk_caption(t: TailRisk) -> str:
     h = t.horizon_days
     return (
         f"Read: on {tail} of past days the 1-day loss was larger than the 1-day VaR. The "
-        f"{h}-day figures shown are those 1-day values × √{h}, an approximation, not "
-        f"measured {h}-day losses. For comparison, the historical VaR of overlapping "
+        f"{h}-day historical figures are those 1-day values × √{h}, an approximation, not "
+        f"measured {h}-day losses. The normal figures use the {h}-day normal distribution "
+        f"(mean × {h}, volatility × √{h}), exact only if daily returns are independent and "
+        f"normal. For comparison, the historical VaR of overlapping "
         f"{h}-day returns in this sample is {pct(t.historical_var_overlapping)} (overlapping "
         "windows share days, so this estimate is noisy). Based on past data only: not a "
         "forecast."

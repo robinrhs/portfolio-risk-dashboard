@@ -1,5 +1,7 @@
 """Metric tests on synthetic return series whose correct answers are known in closed form."""
 
+import math
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -138,6 +140,23 @@ def test_parametric_var_and_es_closed_form():
     assert m.parametric_var(r, 0.99) == pytest.approx(2.3263479 * sigma - mu, rel=1e-6)
     expected_es = sigma * norm.pdf(norm.ppf(0.95)) / 0.05 - mu
     assert m.parametric_es(r, 0.95) == pytest.approx(expected_es)
+
+
+def test_parametric_h_day_var_and_es_use_the_h_day_normal_distribution():
+    # Sum of h i.i.d. N(mu, sigma^2) daily returns ~ N(h mu, h sigma^2), so the 10-day
+    # figures are z sigma sqrt(10) - 10 mu, not (z sigma - mu) sqrt(10).
+    mu, sigma, h = 0.0005, 0.01, 10
+    r = exact_moments(2000, mu, sigma, seed=3)
+    z = 1.6448536269514722  # standard normal 95 % quantile
+    phi = math.exp(-(z**2) / 2) / math.sqrt(2 * math.pi)  # standard normal density at z
+    assert m.parametric_var(r, 0.95, h) == pytest.approx(z * sigma * math.sqrt(h) - h * mu)
+    assert m.parametric_var(r, 0.95, h) == pytest.approx(0.0470148, abs=1e-7)
+    assert m.parametric_es(r, 0.95, h) == pytest.approx(sigma * math.sqrt(h) * phi / 0.05 - h * mu)
+    assert m.parametric_es(r, 0.95, h) == pytest.approx(0.0602287, abs=1e-7)
+    # h = 1 is the ordinary 1-day figure.
+    assert m.parametric_var(r, 0.95, 1) == pytest.approx(z * sigma - mu)
+    with pytest.raises(ValueError):
+        m.parametric_var(r, 0.95, 0)
 
 
 def test_historical_matches_parametric_on_large_normal_sample():

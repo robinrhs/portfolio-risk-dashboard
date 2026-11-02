@@ -43,7 +43,7 @@ uv run portfolio-risk --help               # the same figures as a terminal repo
 uv run pytest                              # tests (offline, synthetic data)
 ```
 
-The app opens with a diversified default portfolio (VTI 30 %, VEA 20 %, VWO 10 %, BND 25 %, GLD 10 %, VNQ 5 %) against the iShares MSCI World ETF (`URTH`), so it is useful straight away. An example CSV is in [`data/example_portfolio.csv`](data/example_portfolio.csv). Weights can be in any unit (percent, fractions or amounts of money); they are normalised to 100 % and the app tells you when it rescaled them.
+The app opens with a diversified default portfolio (VTI 30 %, VEA 20 %, VWO 10 %, BND 25 %, GLD 10 %, VNQ 5 %) against the iShares MSCI World ETF (`URTH`), so it is useful straight away. An example CSV is in [`data/example_portfolio.csv`](data/example_portfolio.csv). Weights can be in any unit (percent, fractions or amounts of money); they are normalised to 100 % and the app tells you when it rescaled them. A weight must be a plain number (`50` or `0.5`): a value such as `50%`, `1,000` or `inf` stops with an error that names the ticker, and a ticker without a weight is left out with a note.
 
 ## Example output
 

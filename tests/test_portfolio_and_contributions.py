@@ -51,6 +51,27 @@ def test_invalid_weights_raise():
         clean_portfolio(table(["A"], [0]))
 
 
+@pytest.mark.parametrize(
+    ("csv_weight", "shown"),
+    [("50%", "'50%'"), ('"1,000"', "'1,000'"), ("abc", "'abc'"), ("inf", "'inf'")],
+)
+def test_unparseable_or_infinite_weight_is_an_error_naming_the_ticker(csv_weight, shown):
+    # Before: the bad row was dropped and the rest silently rescaled to 100 %.
+    csv = io.StringIO(f"ticker,weight\nAAPL,50\nMSFT,{csv_weight}\n")
+    with pytest.raises(ValueError, match="plain numbers") as exc:
+        clean_portfolio(read_portfolio_csv(csv))
+    assert f"MSFT ({shown})" in str(exc.value)
+    assert "AAPL" not in str(exc.value)
+
+
+def test_blank_weight_is_left_out_with_a_note_naming_the_ticker():
+    # pandas reads an empty cell and "n/a" as missing; both count as "no weight given".
+    csv = io.StringIO("ticker,weight\nAAPL,60\nMSFT,\nNVDA,n/a\nGOOG,40\n")
+    result = clean_portfolio(read_portfolio_csv(csv))
+    assert result.weights.to_dict() == {"AAPL": 0.6, "GOOG": 0.4}
+    assert "No weight given for MSFT, NVDA; left out." in result.notes
+
+
 def test_default_portfolio_sums_to_100():
     assert sum(DEFAULT_PORTFOLIO.values()) == pytest.approx(100.0)
     assert clean_portfolio(default_portfolio_table()).notes == []

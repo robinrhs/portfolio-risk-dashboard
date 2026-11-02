@@ -547,7 +547,11 @@ def main() -> None:
 
     bench_prices = cleaned.prices[benchmark] if benchmark in cleaned.prices.columns else None
     prices = cleaned.prices[valid]
-    result = analyze(prices, weights, bench_prices, inputs.settings)
+    try:
+        result = analyze(prices, weights, bench_prices, inputs.settings)
+    except ValueError as exc:  # e.g. prices that never moved: zero volatility
+        st.error(f"These prices cannot be analysed: {exc}")
+        st.stop()
     first, last = result.portfolio.index[0], result.portfolio.index[-1]
     st.caption(
         f"Period analysed: {date_str(first)} – {date_str(last)} · {len(result.portfolio)} daily "

@@ -146,3 +146,16 @@ def test_csv_upload_is_used_and_bad_csv_is_reported():
     at.run()
     assert "Could not read CSV" in texts(at.error)
     assert not at.exception  # falls back to the default portfolio instead of crashing
+
+
+def test_flat_prices_show_an_error_instead_of_a_traceback(monkeypatch):
+    def flat_download(tickers, start, end):
+        index = pd.bdate_range(start, end)
+        return pd.DataFrame({t: 100.0 for t in tickers}, index=index)
+
+    monkeypatch.setattr(data, "download_prices", flat_download)
+    at = AppTest.from_file(APP_FILE, default_timeout=60)
+    at.run()
+    assert not at.exception, at.exception
+    assert "Portfolio volatility is zero" in texts(at.error)
+    assert not at.metric

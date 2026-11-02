@@ -56,7 +56,10 @@ def risk_contributions(cov: pd.DataFrame, weights: pd.Series) -> pd.DataFrame:
     sigma = cov.to_numpy(dtype=float)
     port_vol = float(np.sqrt(w @ sigma @ w))
     if np.isclose(port_vol, 0.0):
-        raise ValueError("Portfolio volatility is zero; risk contributions are undefined.")
+        raise ValueError(
+            "Portfolio volatility is zero (the prices did not move in this period), so "
+            "volatility-based figures and risk contributions are undefined."
+        )
     marginal = sigma @ w / port_vol
     contribution = w * marginal
     return pd.DataFrame(

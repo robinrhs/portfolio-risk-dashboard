@@ -41,6 +41,28 @@ def test_clean_prices_flags_invalid_late_and_gaps():
     assert "DEAD" in text and "LATE" in text and "filled" in text
 
 
+def test_clean_prices_reports_days_dropped_for_long_gaps():
+    raw = ragged_prices()[["A", "B"]].copy()
+    raw.iloc[60:70, 1] = np.nan  # B has no price for 10 days (e.g. a trading halt)
+    cleaned = data.clean_prices(raw, ["A", "B"])
+    # The first MAX_FILL_DAYS are filled (plus the 2-day holiday in ragged_prices),
+    # the rest of the long gap is dropped and reported rather than silently removed.
+    assert cleaned.filled_cells == 2 + data.MAX_FILL_DAYS
+    assert cleaned.dropped_days == 10 - data.MAX_FILL_DAYS
+    assert len(cleaned.prices) == 100 - cleaned.dropped_days
+    assert "5 trading days were dropped" in " ".join(cleaned.messages())
+
+
+def test_late_benchmark_cuts_the_window_and_is_named():
+    raw = ragged_prices()[["A", "B"]].copy()
+    raw["BENCH"] = np.linspace(200, 210, 100)
+    raw.iloc[:40, 2] = np.nan  # benchmark history starts 40 days later
+    cleaned = data.clean_prices(raw, ["A", "B", "BENCH"])
+    assert cleaned.prices.index[0] == raw.index[40]
+    assert list(cleaned.late_start) == ["BENCH"]
+    assert "BENCH (2024-02-26) start later" in " ".join(cleaned.messages())
+
+
 def test_clean_prices_errors():
     raw = ragged_prices()
     with pytest.raises(data.DataError):

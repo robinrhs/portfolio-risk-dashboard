@@ -47,6 +47,7 @@ class CleanPrices:
     late_start: dict[str, pd.Timestamp] = field(default_factory=dict)
     early_end: dict[str, pd.Timestamp] = field(default_factory=dict)
     filled_cells: int = 0
+    dropped_days: int = 0
 
     def messages(self) -> list[str]:
         """Plain-English description of the data issues, one sentence each."""
@@ -71,6 +72,12 @@ class CleanPrices:
                 f"{self.filled_cells} missing daily prices (e.g. exchange holidays) were "
                 f"filled with the previous close (max {MAX_FILL_DAYS} days in a row)."
             )
+        if self.dropped_days:
+            out.append(
+                f"{self.dropped_days} trading days were dropped because a ticker had no price "
+                f"for more than {MAX_FILL_DAYS} days in a row. The return after such a gap "
+                "covers several days, which slightly distorts daily volatility and VaR."
+            )
         return out
 
 
@@ -87,7 +94,7 @@ def clean_prices(
        (latest first date to earliest last date). Statistics such as correlation
        and portfolio volatility need every asset on every day.
     3. Short gaps inside that window are forward-filled; any row still incomplete
-       is dropped.
+       (a gap longer than MAX_FILL_DAYS) is dropped and counted in `dropped_days`.
 
     `tolerance_days` avoids warning about a ticker that starts a few days after
     the others just because of a holiday at the start of the window.
@@ -115,7 +122,8 @@ def clean_prices(
     filled = window.ffill(limit=MAX_FILL_DAYS)
     filled_cells = int(window.isna().sum().sum() - filled.isna().sum().sum())
     aligned = filled.dropna(how="any")
-    return CleanPrices(aligned, invalid, late_start, early_end, filled_cells)
+    dropped_days = len(filled) - len(aligned)
+    return CleanPrices(aligned, invalid, late_start, early_end, filled_cells, dropped_days)
 
 
 def currency_warning(currencies: dict[str, str | None]) -> str | None:

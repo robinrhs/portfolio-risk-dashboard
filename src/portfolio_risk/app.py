@@ -171,9 +171,11 @@ def sidebar() -> Inputs:
         help="URTH = iShares MSCI World ETF. Alternatives: SPY (S&P 500), ACWI, EUNL.DE.",
     )
     today = dt.date.today()
-    col1, col2 = sb.columns(2)
-    start = col1.date_input("Start", today - dt.timedelta(days=5 * 365), max_value=today)
-    end = col2.date_input("End", today, max_value=today)
+    # Stacked, not side by side: two date fields do not fit next to each other in the sidebar.
+    start = sb.date_input(
+        "Start", today - dt.timedelta(days=5 * 365), max_value=today, format="YYYY-MM-DD"
+    )
+    end = sb.date_input("End", today, max_value=today, format="YYYY-MM-DD")
     rf = sb.number_input(
         "Risk-free rate (% p.a.)",
         min_value=-2.0,

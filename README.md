@@ -113,7 +113,7 @@ All maths lives in UI-free modules (`metrics.py`, `contributions.py`, `optimize.
 | Return contribution | $w_i\,\bar r_i\,N$ | sums to the arithmetic mean return (not to CAGR) |
 | Risk contribution | $RC_i = w_i\,(\Sigma w)_i / \sigma_p$ | Euler: $\sum_i RC_i = \sigma_p$ because $\sigma_p$ is homogeneous of degree 1 in $w$ |
 | Min variance | $\min_w w^\top\Sigma w$ | s.t. $\sum w_i = 1$, $0 \le w_i \le 1$ |
-| Max Sharpe | $\max_w (w^\top\mu - r_f)/\sqrt{w^\top\Sigma w}$ | same constraints, SLSQP |
+| Max Sharpe | $\max_w (w^\top\mu - N r_{f,d})/\sqrt{w^\top\Sigma w}$ | same constraints, SLSQP; $\mu = N\,\bar r$ and $N r_{f,d}$ put it on the same basis as the headline Sharpe |
 | Frontier | $\min_w w^\top\Sigma w$ s.t. $w^\top\mu = \mu^*$ | $\mu^*$ from the min-variance return to the best single asset |
 
 VaR and ES are shown as positive numbers (loss as a share of portfolio value) and, for convenience, in money for a portfolio value you choose.

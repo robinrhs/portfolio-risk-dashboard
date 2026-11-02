@@ -152,6 +152,31 @@ def analyze(
     )
 
 
+@dataclass(frozen=True)
+class MeanVarianceInputs:
+    """Annualised inputs for the optimiser, on the same basis as the headline Sharpe ratio."""
+
+    mu: pd.Series  # arithmetic mean daily return x N
+    cov: pd.DataFrame  # daily covariance (ddof = 1) x N
+    risk_free: float  # daily risk-free rate x N (not the raw annual rate)
+
+
+def mean_variance_inputs(asset_returns: pd.DataFrame, risk_free: float) -> MeanVarianceInputs:
+    """Historical mu, Sigma and risk-free rate for the efficient frontier.
+
+    The headline Sharpe ratio is mean(r_t - rf_d) * N / (std(r_t) * sqrt(N)) with the
+    geometrically de-compounded daily rate rf_d = (1 + rf) ** (1/N) - 1. That equals
+    (w' mu - N * rf_d) / sqrt(w' Sigma w) with the annualised mu and Sigma below, so
+    passing N * rf_d (not rf itself) to the optimiser makes the frontier tab's
+    Sharpe figures identical to the headline one for the same weights.
+    """
+    return MeanVarianceInputs(
+        mu=asset_returns.mean() * m.TRADING_DAYS,
+        cov=asset_returns.cov() * m.TRADING_DAYS,
+        risk_free=m.per_period_rate(risk_free) * m.TRADING_DAYS,
+    )
+
+
 def summary_table(result: Analysis) -> pd.DataFrame:
     """Portfolio vs benchmark headline figures as a tidy table (for display and CSV export)."""
 

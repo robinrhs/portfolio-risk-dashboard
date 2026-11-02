@@ -6,7 +6,7 @@ import pytest
 from conftest import synthetic_prices
 
 from portfolio_risk import charts, data, metrics
-from portfolio_risk.analysis import Settings, analyze, summary_table
+from portfolio_risk.analysis import Settings, analyze, mean_variance_inputs, summary_table
 
 # --- clean_prices ------------------------------------------------------------
 
@@ -204,3 +204,20 @@ def test_analyze_without_benchmark_and_charts_build():
     charts.correlation_heatmap(result.correlation_matrix)
     charts.weight_vs_risk_chart(result.contributions)
     charts.return_contribution_chart(result.contributions)
+
+
+def test_frontier_sharpe_uses_the_same_risk_free_convention_as_the_headline():
+    prices = synthetic_prices(["A", "B", "C"], dt.date(2021, 1, 1), dt.date(2023, 12, 31))
+    returns = metrics.simple_returns(prices)
+    weights = pd.Series({"A": 0.5, "B": 0.3, "C": 0.2})
+    result = analyze(prices, weights, None, Settings(risk_free=0.05))
+
+    inputs = mean_variance_inputs(returns, 0.05)
+    # Independent value: 252 x the de-compounded daily rate, not the raw 5 %.
+    assert inputs.risk_free == pytest.approx(252 * (1.05 ** (1 / 252) - 1), rel=1e-12)
+    assert inputs.risk_free == pytest.approx(0.0487949, abs=1e-7)
+    w = weights[inputs.mu.index].to_numpy()
+    frontier_style = (w @ inputs.mu.to_numpy() - inputs.risk_free) / np.sqrt(
+        w @ inputs.cov.to_numpy() @ w
+    )
+    assert frontier_style == pytest.approx(result.portfolio_stats.sharpe, rel=1e-10)

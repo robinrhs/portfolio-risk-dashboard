@@ -7,6 +7,10 @@ in mu move the "optimal" weights a lot. Treat the output as an illustration
 of the risk/return trade-off, not as a recommended allocation.
 
 Constraints everywhere: long-only (0 <= w_i <= 1) and fully invested (sum w_i = 1).
+
+`risk_free` must be on the same basis as mu. The app passes N x the daily
+risk-free rate (see analysis.mean_variance_inputs), so the Sharpe figures here
+match the headline Sharpe ratio for the same weights.
 """
 
 from __future__ import annotations

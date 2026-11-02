@@ -13,7 +13,14 @@ import pandas as pd
 import streamlit as st
 
 from portfolio_risk import charts, data, metrics, optimize
-from portfolio_risk.analysis import Analysis, Settings, TailRisk, analyze, summary_table
+from portfolio_risk.analysis import (
+    Analysis,
+    Settings,
+    TailRisk,
+    analyze,
+    mean_variance_inputs,
+    summary_table,
+)
 from portfolio_risk.portfolio import (
     DEFAULT_BENCHMARK,
     clean_portfolio,
@@ -83,15 +90,16 @@ def load_market_data(
 
 @st.cache_data(ttl=PRICE_CACHE_TTL, show_spinner="Optimising ...")
 def compute_frontier(asset_returns: pd.DataFrame, risk_free: float) -> dict:
-    # Annualised historical estimates of expected return and covariance.
-    mu = asset_returns.mean() * metrics.TRADING_DAYS
-    cov = asset_returns.cov() * metrics.TRADING_DAYS
+    # Annualised historical estimates; rf on the same basis as the headline Sharpe.
+    inputs = mean_variance_inputs(asset_returns, risk_free)
+    mu, cov, rf = inputs.mu, inputs.cov, inputs.risk_free
     return {
         "mu": mu,
         "cov": cov,
-        "frontier": optimize.efficient_frontier(mu, cov, n_points=30, risk_free=risk_free),
-        "min_var": optimize.min_variance_portfolio(mu, cov, risk_free),
-        "max_sharpe": optimize.max_sharpe_portfolio(mu, cov, risk_free),
+        "rf": rf,
+        "frontier": optimize.efficient_frontier(mu, cov, n_points=30, risk_free=rf),
+        "min_var": optimize.min_variance_portfolio(mu, cov, rf),
+        "max_sharpe": optimize.max_sharpe_portfolio(mu, cov, rf),
     }
 
 
@@ -446,7 +454,8 @@ def frontier_tab(result: Analysis, settings: Settings) -> None:
             ],
             "Volatility": [current[0], f["min_var"].volatility, f["max_sharpe"].volatility],
             "Sharpe": [
-                (current[1] - settings.risk_free) / current[0],
+                # Same convention as the headline Sharpe, so the two figures agree.
+                (current[1] - f["rf"]) / current[0],
                 f["min_var"].sharpe,
                 f["max_sharpe"].sharpe,
             ],

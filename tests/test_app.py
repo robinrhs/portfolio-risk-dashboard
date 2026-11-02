@@ -159,3 +159,17 @@ def test_flat_prices_show_an_error_instead_of_a_traceback(monkeypatch):
     assert not at.exception, at.exception
     assert "Portfolio volatility is zero" in texts(at.error)
     assert not at.metric
+
+
+def test_frontier_tab_sharpe_matches_the_headline_sharpe_convention():
+    import datetime as dt
+
+    from portfolio_risk import metrics
+    from portfolio_risk.portfolio import portfolio_returns
+
+    prices = synthetic_prices(["AAA", "CCC", "DDD"], dt.date(2021, 1, 1), dt.date(2023, 12, 31))
+    returns = metrics.simple_returns(prices)
+    f = app_module.compute_frontier(returns, 0.05)
+    for point in (f["max_sharpe"], f["min_var"]):
+        headline = metrics.sharpe_ratio(portfolio_returns(returns, point.weights), 0.05)
+        assert point.sharpe == pytest.approx(headline, rel=1e-8)

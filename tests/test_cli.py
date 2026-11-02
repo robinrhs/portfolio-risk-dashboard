@@ -46,6 +46,8 @@ def test_short_window_is_refused_like_in_the_app():
         (["--start", "2025-10-31", "--end", "2025-01-01"], "must be before --end"),
         (["--confidence", "95"], "between 0 and 1"),
         (["--horizon", "0"], "at least 1 trading day"),
+        (["--rf", "2"], "--rf is an annual rate as a fraction"),  # 2 typed for 2 %
+        (["--rf", "-0.05"], "--rf is an annual rate as a fraction"),
     ],
 )
 def test_invalid_arguments_exit_with_usage_error(argv, message, capsys):
@@ -60,6 +62,27 @@ def test_data_errors_exit_with_one_line_message(tmp_path):
         cli.main(["--benchmark", "BADBENCH", "--csv", str(write_csv(tmp_path, "BADX"))])
     with pytest.raises(SystemExit, match="Error: .*No such file"):
         cli.main(["--csv", str(tmp_path / "missing.csv")])
+
+
+@pytest.mark.parametrize(
+    ("csv_text", "message"),
+    [
+        ("ticker,weight\nVTI,70\nBND,-30\n", "Negative weights are not supported .*: BND"),
+        ("symbol,amount\nVTI,1\n", "CSV needs two columns named 'ticker' and 'weight'"),
+        ("ticker,weight\nVTI,50\nBND,50%\n", r"Weights must be plain numbers.*BND \('50%'\)"),
+    ],
+)
+def test_bad_csv_exits_with_one_line_message(tmp_path, csv_text, message):
+    csv = tmp_path / "p.csv"
+    csv.write_text(csv_text)
+    with pytest.raises(SystemExit, match=f"^Error: {message}"):
+        cli.main(["--csv", str(csv)])
+
+
+def test_no_usable_portfolio_ticker_exits_even_if_the_benchmark_has_data(tmp_path):
+    # BADX has no prices, the default benchmark URTH does: nothing left to analyse.
+    with pytest.raises(SystemExit, match="Error: None of the portfolio tickers has usable"):
+        cli.main(["--csv", str(write_csv(tmp_path, "BADX"))])
 
 
 def write_csv(folder, ticker: str):

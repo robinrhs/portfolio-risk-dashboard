@@ -47,7 +47,7 @@ The app opens with a diversified default portfolio (VTI 30 %, VEA 20 %, VWO 10 %
 
 ## Example output
 
-Real output of the command-line report for the default portfolio, run on 2 Nov 2026 (`uv run portfolio-risk --start 2020-11-02 --end 2025-10-31`). Yahoo revises adjusted prices from time to time, so later runs can differ slightly in the last digits. The CLI uses the same `analyze()` call and the same input checks as the app (start before end, confidence between 0 and 1, at least 60 trading days) and exits with a one-line error otherwise.
+Real output of the command-line report for the default portfolio, run on 2 Nov 2026 (`uv run portfolio-risk --start 2020-11-02 --end 2025-10-31`). Yahoo revises adjusted prices from time to time, so later runs can differ slightly in the last digits. The CLI uses the same `analyze()` call and the same input checks as the app (start before end, risk-free rate between −2 % and 20 % given as a fraction, confidence between 0 and 1, at least 60 trading days) and exits with a one-line error otherwise.
 
 ```text
 Period: 2020-11-03 to 2025-10-31 (1255 daily returns)
@@ -179,7 +179,7 @@ portfolio-risk-dashboard/
 
 ### Tests
 
-`uv run pytest` runs offline. The maths tests use synthetic series with known answers: constant returns, series rescaled to an exact mean and volatility, a hand-computed drawdown and Sortino, VaR/ES on a uniform grid and on a large normal sample, risk contributions that must sum to volatility, and the closed-form two-asset minimum-variance and tangency portfolios. `analyze()` is checked on two assets where one moves exactly 3× the other, so beta, volatility and the risk contributions are known in closed form. The app test runs the real `streamlit_app.py` with `streamlit.testing.v1.AppTest` and replaces the Yahoo download with deterministic synthetic prices; it covers the default portfolio, invalid tickers, currency mixes, weight normalisation, the CSV upload, the 60-day minimum and the wording of the horizon caption. The CLI tests check the printed report and every error exit.
+`uv run pytest` runs offline. The maths tests use synthetic series with known answers: constant returns, series rescaled to an exact mean and volatility, a hand-computed drawdown and Sortino, VaR/ES on a uniform grid and on a large normal sample, risk contributions that must sum to volatility, and the closed-form two-asset minimum-variance and tangency portfolios. `analyze()` is checked on two assets where one moves exactly 3× the other, so beta, volatility and the risk contributions are known in closed form. The app test runs the real `streamlit_app.py` with `streamlit.testing.v1.AppTest` and replaces the Yahoo download with deterministic synthetic prices; it covers the default portfolio, invalid tickers, currency mixes, weight normalisation, the CSV upload, the 60-day minimum and the wording of the horizon caption. The CLI tests check the printed report and the error exits: invalid arguments (dates, `--rf`, `--confidence`, `--horizon`), a CSV with a negative or non-numeric weight or without ticker/weight columns, a missing CSV file, no price data at all, no usable portfolio ticker, and a too-short period.
 
 ## License
 

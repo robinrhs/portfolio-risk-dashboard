@@ -4,8 +4,9 @@ Example:
     uv run portfolio-risk --start 2020-11-01 --end 2025-10-31
     uv run portfolio-risk --csv data/example_portfolio.csv --benchmark SPY
 
-It applies the same input checks as the app (start before end, confidence
-between 0 and 1, at least `data.MIN_OBSERVATIONS` overlapping trading days)
+It applies the same input checks as the app (start before end, risk-free rate
+between -2 % and 20 %, confidence between 0 and 1, at least
+`data.MIN_OBSERVATIONS` overlapping trading days)
 and exits with a one-line error message instead of a traceback.
 """
 
@@ -45,6 +46,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     # p.error prints the usage line plus the message and exits with status 2.
     if args.start >= args.end:
         p.error(f"--start ({args.start}) must be before --end ({args.end})")
+    # Same range as the app's input (-2 % to 20 %); catches "2" typed for 2 %.
+    if not -0.02 <= args.rf <= 0.20:
+        p.error(f"--rf is an annual rate as a fraction, e.g. 0.02 for 2 % (got {args.rf})")
     if not 0.0 < args.confidence < 1.0:
         p.error(f"--confidence must be between 0 and 1, e.g. 0.95 (got {args.confidence})")
     if args.horizon < 1:

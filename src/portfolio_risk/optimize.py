@@ -87,7 +87,17 @@ def max_sharpe_portfolio(
 
     The point where a line from the risk-free rate touches the efficient
     frontier (the capital market line in textbook CAPM).
+
+    Raises ValueError if no asset's expected return is above the risk-free rate.
+    Every long-only portfolio then has a Sharpe ratio <= 0, and "maximising" it
+    picks the least negative ratio, which favours the most volatile asset even
+    if it has the lowest return. That is not a meaningful tangency portfolio.
     """
+    if float(mu.max()) <= risk_free:
+        raise ValueError(
+            "No asset had an expected return above the risk-free rate in this period, "
+            "so a max-Sharpe (tangency) portfolio is not meaningful."
+        )
     m, sigma = mu.to_numpy(), cov.to_numpy()
 
     def negative_sharpe(w: np.ndarray) -> float:

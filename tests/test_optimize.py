@@ -79,3 +79,15 @@ def test_max_sharpe_beats_every_frontier_point_and_min_var_is_lowest_risk():
     equal = np.full(len(mu), 1 / len(mu))
     assert min_var.volatility <= portfolio_volatility(equal, cov.to_numpy())
     assert min_var.volatility <= frontier["volatility"].min() + 1e-6
+
+
+def test_max_sharpe_is_refused_when_no_asset_beats_the_risk_free_rate():
+    # Without the guard the "max Sharpe" point was 100 % A: return -5 %, vol 20 %,
+    # Sharpe (-0.05 - 0.02) / 0.20 = -0.35, the worst asset, only because it is the most volatile.
+    mu, cov = two_assets(s1=0.20, s2=0.05, rho=0.0, mu1=-0.05, mu2=0.00)
+    with pytest.raises(ValueError, match="risk-free rate"):
+        max_sharpe_portfolio(mu, cov, risk_free=0.02)
+    with pytest.raises(ValueError, match="risk-free rate"):
+        max_sharpe_portfolio(mu, cov, risk_free=0.0)  # best asset only equals rf
+    # One asset above rf is enough for a meaningful tangency portfolio.
+    assert max_sharpe_portfolio(mu, cov, risk_free=-0.01).sharpe > 0

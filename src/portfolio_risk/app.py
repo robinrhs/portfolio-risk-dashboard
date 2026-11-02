@@ -93,13 +93,17 @@ def compute_frontier(asset_returns: pd.DataFrame, risk_free: float) -> dict:
     # Annualised historical estimates; rf on the same basis as the headline Sharpe.
     inputs = mean_variance_inputs(asset_returns, risk_free)
     mu, cov, rf = inputs.mu, inputs.cov, inputs.risk_free
+    try:
+        max_sharpe = optimize.max_sharpe_portfolio(mu, cov, rf)
+    except ValueError:  # no asset beat the risk-free rate: no meaningful tangency point
+        max_sharpe = None
     return {
         "mu": mu,
         "cov": cov,
         "rf": rf,
         "frontier": optimize.efficient_frontier(mu, cov, n_points=30, risk_free=rf),
         "min_var": optimize.min_variance_portfolio(mu, cov, rf),
-        "max_sharpe": optimize.max_sharpe_portfolio(mu, cov, rf),
+        "max_sharpe": max_sharpe,
     }
 
 
@@ -427,40 +431,35 @@ def frontier_tab(result: Analysis, settings: Settings) -> None:
     )
     # Single-asset volatility = square root of the covariance matrix diagonal.
     assets = pd.DataFrame({"return": f["mu"], "volatility": np.sqrt(np.diag(f["cov"]))})
-    points = {
-        "Min variance": (f["min_var"].volatility, f["min_var"].expected_return),
-        "Max Sharpe": (f["max_sharpe"].volatility, f["max_sharpe"].expected_return),
-        "Your portfolio": current,
-    }
+    # Same Sharpe convention as the headline figure, so the two agree.
+    yours = optimize.OptimizedPortfolio(
+        weights, current[1], current[0], (current[1] - f["rf"]) / current[0]
+    )
+    portfolios = {"Your portfolio": yours, "Min variance": f["min_var"]}
+    if f["max_sharpe"] is not None:
+        portfolios["Max Sharpe"] = f["max_sharpe"]
+    # Reversed so "Your portfolio" is drawn last, on top of the other markers.
+    points = {n: (p.volatility, p.expected_return) for n, p in reversed(portfolios.items())}
     st.warning(
         "Illustration, not a recommendation. Expected returns are simply the historical "
         "averages of this period; mean-variance weights react very strongly to them.",
         icon=":material/warning:",
     )
+    if f["max_sharpe"] is None:
+        st.info(
+            "No asset beat the risk-free rate in this period, so a max-Sharpe portfolio is "
+            "not meaningful and is not shown.",
+            icon=":material/info:",
+        )
     st.plotly_chart(charts.frontier_chart(f["frontier"], assets, points))
-    table = pd.DataFrame(
-        {
-            "Your portfolio": weights,
-            "Min variance": f["min_var"].weights,
-            "Max Sharpe": f["max_sharpe"].weights,
-        }
-    )
+    table = pd.DataFrame({name: p.weights for name, p in portfolios.items()})
     stats = pd.DataFrame(
         {
-            "Expected return (hist. mean)": [
-                current[1],
-                f["min_var"].expected_return,
-                f["max_sharpe"].expected_return,
-            ],
-            "Volatility": [current[0], f["min_var"].volatility, f["max_sharpe"].volatility],
-            "Sharpe": [
-                # Same convention as the headline Sharpe, so the two figures agree.
-                (current[1] - f["rf"]) / current[0],
-                f["min_var"].sharpe,
-                f["max_sharpe"].sharpe,
-            ],
+            "Expected return (hist. mean)": [p.expected_return for p in portfolios.values()],
+            "Volatility": [p.volatility for p in portfolios.values()],
+            "Sharpe": [p.sharpe for p in portfolios.values()],
         },
-        index=["Your portfolio", "Min variance", "Max Sharpe"],
+        index=list(portfolios),
     )
     left, right = st.columns(2)
     left.markdown("**Weights** (long-only, sum to 100 %)")

@@ -173,3 +173,19 @@ def test_frontier_tab_sharpe_matches_the_headline_sharpe_convention():
     for point in (f["max_sharpe"], f["min_var"]):
         headline = metrics.sharpe_ratio(portfolio_returns(returns, point.weights), 0.05)
         assert point.sharpe == pytest.approx(headline, rel=1e-8)
+
+
+def test_frontier_tab_skips_max_sharpe_when_no_asset_beats_the_risk_free_rate(monkeypatch):
+    import numpy as np
+
+    def falling_download(tickers, start, end):
+        prices = synthetic_prices(tickers, start, end)
+        drift = np.exp(-0.002 * np.arange(len(prices)))  # about -40 % a year on top
+        return prices.mul(drift, axis=0)
+
+    monkeypatch.setattr(data, "download_prices", falling_download)
+    at = AppTest.from_file(APP_FILE, default_timeout=60)
+    at.run()
+    assert not at.exception, at.exception
+    assert "max-Sharpe portfolio is not meaningful" in texts(at.info)
+    assert not at.error

@@ -20,12 +20,18 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
 import pandas as pd
+import yfinance as yf
 
 # Gaps of up to this many consecutive trading days are forward-filled (price held
 # flat, i.e. a 0 % return), which mainly covers different exchange holidays.
 MAX_FILL_DAYS = 5
 # Below this many overlapping daily returns the statistics are too noisy to show.
 MIN_OBSERVATIONS = 60
+
+# yfinance triggers pandas deprecation warnings internally; hide those (and only those).
+# Must come after `import yfinance`, which installs its own warning filter on import.
+warnings.filterwarnings("ignore", module=r"yfinance(\..*)?$")
+logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
 
 class DataError(RuntimeError):
@@ -150,22 +156,17 @@ def download_prices(tickers: list[str], start: dt.date, end: dt.date) -> pd.Data
     treats `end` as exclusive, so one day is added. Returns one column per
     requested ticker; tickers without data come back as all-NaN columns.
     """
-    import yfinance as yf  # imported lazily so the maths modules never need it
-
-    logging.getLogger("yfinance").setLevel(logging.CRITICAL)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")  # yfinance emits pandas deprecation noise
-        try:
-            raw = yf.download(
-                tickers,
-                start=start,
-                end=end + dt.timedelta(days=1),
-                auto_adjust=True,
-                progress=False,
-                threads=True,
-            )
-        except Exception as exc:  # network errors, rate limits, ...
-            raise DataError(f"Download from Yahoo Finance failed: {exc}") from exc
+    try:
+        raw = yf.download(
+            tickers,
+            start=start,
+            end=end + dt.timedelta(days=1),
+            auto_adjust=True,
+            progress=False,
+            threads=True,
+        )
+    except Exception as exc:  # network errors, rate limits, ...
+        raise DataError(f"Download from Yahoo Finance failed: {exc}") from exc
 
     if raw is None or raw.empty:
         raise DataError("Yahoo Finance returned no data (check tickers, dates or connection).")
@@ -180,8 +181,6 @@ def download_prices(tickers: list[str], start: dt.date, end: dt.date) -> pd.Data
 
 def fetch_currency(ticker: str) -> str | None:
     """Quote currency of a ticker according to Yahoo (None if unknown)."""
-    import yfinance as yf
-
     try:
         return yf.Ticker(ticker).fast_info["currency"]
     except Exception:  # unknown ticker, network error, missing field
@@ -190,8 +189,5 @@ def fetch_currency(ticker: str) -> str | None:
 
 def fetch_currencies(tickers: list[str]) -> dict[str, str | None]:
     """Quote currency per ticker, looked up in parallel (one small request each)."""
-    logging.getLogger("yfinance").setLevel(logging.CRITICAL)
-    # Warning filters are process-wide, so set them here, not inside the worker threads.
-    with warnings.catch_warnings(), ThreadPoolExecutor(max_workers=8) as pool:
-        warnings.simplefilter("ignore")
+    with ThreadPoolExecutor(max_workers=8) as pool:
         return dict(zip(tickers, pool.map(fetch_currency, tickers), strict=True))

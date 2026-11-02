@@ -60,6 +60,7 @@ def drawdown_chart(portfolio_dd: pd.Series, benchmark_dd: pd.Series | None) -> g
         y=portfolio_dd,
         name="Portfolio",
         fill="tozeroy",
+        fillcolor="rgba(42, 120, 214, 0.25)",
         line={"color": PORTFOLIO, "width": 2},
         hovertemplate="%{y:.1%}",
     )
@@ -142,12 +143,13 @@ def return_contribution_chart(contributions: pd.DataFrame) -> go.Figure:
             marker_color=[PORTFOLIO if v >= 0 else "#e34948" for v in df["return_contribution"]],
             text=[f"{v:+.2%}" for v in df["return_contribution"]],
             textposition="outside",
+            cliponaxis=False,  # keep the value label of the longest bar visible
             hovertemplate="%{x:.2%} p.a.<extra>%{y}</extra>",
         )
     )
     fig.update_layout(
         height=max(300, 45 * len(df) + 80),
-        margin={"l": 10, "r": 40, "t": 10, "b": 10},
+        margin={"l": 10, "r": 70, "t": 10, "b": 10},
         showlegend=False,
     )
     fig.update_xaxes(tickformat=".1%", title="Contribution to annual mean return")
@@ -168,15 +170,23 @@ def return_histogram(
             hovertemplate="%{x:.2%}: %{y} days<extra></extra>",
         )
     )
-    for value, label, color, dash in (
-        (historical_var, "Historical VaR", BENCHMARK, "dash"),
-        (parametric_var, "Normal VaR", VIOLET, "dot"),
-    ):
+    # The two thresholds are often close together: put the label of the more
+    # negative one on its left and the other on its right so they never overlap.
+    lines = sorted(
+        [
+            (historical_var, "Historical VaR", BENCHMARK, "dash"),
+            (parametric_var, "Normal VaR", VIOLET, "dot"),
+        ],
+        key=lambda item: item[0],
+        reverse=True,
+    )
+    for (value, label, color, dash), side in zip(lines, ("top left", "top right"), strict=True):
         fig.add_vline(
             x=-value,
             line={"color": color, "width": 2, "dash": dash},
             annotation_text=f"{label} {confidence:.1%}: {-value:.2%}",
-            annotation_position="top left",
+            annotation_position=side,
+            annotation_font_size=11,
         )
     fig.update_layout(
         height=340,

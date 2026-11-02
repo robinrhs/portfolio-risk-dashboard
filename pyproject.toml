@@ -39,3 +39,6 @@ dev = [
     "pytest>=9.2.0",
     "ruff>=0.17.3",
 ]
+
+[project.scripts]
+portfolio-risk = "portfolio_risk.cli:main"

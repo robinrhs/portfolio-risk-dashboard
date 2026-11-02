@@ -116,3 +116,33 @@ def test_start_after_end_shows_error():
     at = run_app()
     at.sidebar.date_input[0].set_value(dt.date.today()).run()
     assert "start date must be before" in texts(at.error)
+
+
+def test_too_short_window_shows_minimum_observations_error():
+    import datetime as dt
+
+    at = run_app()
+    end = at.sidebar.date_input[1].value
+    at.sidebar.date_input[0].set_value(end - dt.timedelta(days=30)).run()
+    assert not at.exception
+    errors = texts(at.error)
+    assert "overlapping trading days" in errors
+    assert f"at least {data.MIN_OBSERVATIONS} days" in errors
+    assert not at.metric  # the app stops before showing any annualised figure
+
+
+def test_csv_upload_is_used_and_bad_csv_is_reported():
+    at = run_app()
+    at.sidebar.radio(key="source").set_value("Upload CSV").run()
+    assert "No file uploaded yet" in texts(at.sidebar.caption)
+
+    upload = b"ticker,weight\nAAA,50\nCCC,30\nDDD,20\n"
+    at.sidebar.file_uploader[0].set_value(("mine.csv", upload, "text/csv")).run()
+    assert not at.exception
+    assert DOWNLOADS[-1] == ("AAA", "CCC", "DDD", "URTH")  # uploaded tickers were analysed
+    assert not at.error
+
+    at.sidebar.file_uploader[0].set_value(("bad.csv", b"symbol,amount\nAAA,1\n", "text/csv"))
+    at.run()
+    assert "Could not read CSV" in texts(at.error)
+    assert not at.exception  # falls back to the default portfolio instead of crashing
